@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>𝕚𝕞𝕒𝕘𝕚𝕟𝕖 𝕒 𝕔𝕠𝕠𝕝 𝕥𝕚𝕥𝕝𝕖 </title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#333333">
+<link rel="icon" href="icon.png">
+<style>
+body {
+  background:#eee;
+  display:flex;
+  justify-content:center;
+  padding:20px;
+  font-family:Arial;
+}
+canvas {
+  border:2px solid #333;
+  cursor:crosshair;
+}
+.toolbar {
+  margin-bottom:10px;
+}
+.toolbar input, .toolbar button {
+  margin-right:5px;
+}
+button.active {
+  background:#333;
+  color:#fff;
+}
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+<button id="pixel" class="active">Pixel (W)</button>
+<button id="eraser">Eraser (Q)</button>
+<button id="clear">Clear</button>
+Color: <input type="color" id="colorA" value="#000000">
+Size: <input type="range" id="size" min="1" max="40" value="10">
+<button id="undo">Undo</button>
+<button id="redo">Redo</button>
+<button id="download">Download</button>
+</div>
+
+<canvas id="canvas" width="800" height="600"></canvas>
+
+<script>
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+let tool = "pixel";
+let drawing = false;
+let brushSize = parseInt(document.getElementById("size").value);
+
+/* ===== UNDO / REDO ===== */
+let undoStack = [];
+let redoStack = [];
+
+function saveState() {
+  undoStack.push(ctx.getImageData(0,0,canvas.width,canvas.height));
+  if (undoStack.length > 50) undoStack.shift();
+  redoStack = [];
+}
+
+document.getElementById("undo").onclick = () => {
+  if (!undoStack.length) return;
+  redoStack.push(ctx.getImageData(0,0,canvas.width,canvas.height));
+  ctx.putImageData(undoStack.pop(),0,0);
+};
+
+document.getElementById("redo").onclick = () => {
+  if (!redoStack.length) return;
+  undoStack.push(ctx.getImageData(0,0,canvas.width,canvas.height));
+  ctx.putImageData(redoStack.pop(),0,0);
+};
+
+/* ===== TOOLS ===== */
+const pixelBtn = document.getElementById("pixel");
+const eraserBtn = document.getElementById("eraser");
+
+function setTool(newTool) {
+  tool = newTool;
+  pixelBtn.classList.toggle("active", tool === "pixel");
+  eraserBtn.classList.toggle("active", tool === "eraser");
+}
+
+pixelBtn.onclick = () => setTool("pixel");
+eraserBtn.onclick = () => setTool("eraser");
+
+/* ===== KEYBOARD SHORTCUTS ===== */
+document.addEventListener("keydown", e => {
+  if (e.target.tagName === "INPUT") return;
+
+  if (e.key.toLowerCase() === "q") setTool("eraser");
+  if (e.key.toLowerCase() === "w") setTool("pixel");
+});
+
+/* ===== SIZE ===== */
+document.getElementById("size").oninput = e =>
+  brushSize = parseInt(e.target.value);
+
+/* ===== CLEAR CANVAS ===== */
+document.getElementById("clear").onclick = () => {
+  saveState();
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+};
+
+/* ===== DOWNLOAD ===== */
+document.getElementById("download").onclick = () => {
+  const link = document.createElement("a");
+  link.download = "pixel-art.png";
+  link.href = canvas.toDataURL();
+  link.click();
+};
+
+/* ===== MOUSE POS ===== */
+function getMousePos(e) {
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: (e.clientX - rect.left) * (canvas.width / rect.width),
+    y: (e.clientY - rect.top) * (canvas.height / rect.height)
+  };
+}
+
+/* ===== DRAWING ===== */
+canvas.addEventListener("mousedown", () => {
+  drawing = true;
+  saveState();
+});
+
+canvas.addEventListener("mousemove", e => {
+  if (!drawing) return;
+  const pos = getMousePos(e);
+  const x = Math.floor(pos.x / brushSize) * brushSize;
+  const y = Math.floor(pos.y / brushSize) * brushSize;
+
+  if (tool === "pixel") {
+    ctx.fillStyle = document.getElementById("colorA").value;
+    ctx.fillRect(x, y, brushSize, brushSize);
+  } else {
+    ctx.clearRect(x, y, brushSize, brushSize);
+  }
+});
+
+canvas.addEventListener("mouseup", () => drawing = false);
+canvas.addEventListener("mouseleave", () => drawing = false);
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("service-worker.js");
+}
+</script>
+
+</body>
+</html>
